@@ -1,0 +1,7 @@
+{
+  "name": "Kuis Belajar",
+  "description": "Aplikasi kuis interaktif sekolah untuk latihan soal pilihan ganda, timer, nilai instan, pembahasan lengkap, dan rekap nilai guru.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

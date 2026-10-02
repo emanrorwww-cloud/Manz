@@ -1,0 +1,268 @@
+{
+  "entities": {
+    "Admin": {
+      "title": "Admin",
+      "description": "Data administrator dan guru pengampu",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Alamat email guru atau admin"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "teacher"],
+          "description": "Peran pengguna"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Waktu pendaftaran admin"
+        }
+      },
+      "required": ["email", "role"]
+    },
+    "Subject": {
+      "title": "Subject",
+      "description": "Mata pelajaran ujian sekolah",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "ID unik mata pelajaran"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Nama mata pelajaran"
+        },
+        "iconName": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Nama ikon Lucide"
+        },
+        "color": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Tema warna mata pelajaran"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Deskripsi materi pelajaran"
+        },
+        "teacherName": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Nama guru pengampu"
+        },
+        "targetQuestionCount": {
+          "type": "number",
+          "description": "Jumlah butir soal yang diujikan"
+        },
+        "timerMode": {
+          "type": "string",
+          "enum": ["per_question", "total_quiz", "none"],
+          "description": "Mode waktu pengerjaan"
+        },
+        "timerSecondsPerQuestion": {
+          "type": "number",
+          "description": "Detik per soal jika mode per_question"
+        },
+        "totalQuizMinutes": {
+          "type": "number",
+          "description": "Total menit ujian (misal 90 atau 120 menit)"
+        },
+        "passingGrade": {
+          "type": "number",
+          "description": "Nilai KKM (Kriteria Ketuntasan Minimal)"
+        },
+        "teacherNotes": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Catatan arahan dari guru"
+        },
+        "isPublic": {
+          "type": "boolean",
+          "description": "Status ketersediaan untuk siswa"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Waktu pembaharuan terakhir"
+        }
+      },
+      "required": ["id", "name", "totalQuizMinutes", "passingGrade"]
+    },
+    "Question": {
+      "title": "Question",
+      "description": "Butir soal ujian pilihan ganda",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "ID unik butir soal"
+        },
+        "subjectId": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "ID mata pelajaran terkait"
+        },
+        "question": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "Teks pertanyaan soal"
+        },
+        "options": {
+          "type": "object",
+          "properties": {
+            "A": { "type": "string", "maxLength": 500 },
+            "B": { "type": "string", "maxLength": 500 },
+            "C": { "type": "string", "maxLength": 500 },
+            "D": { "type": "string", "maxLength": 500 }
+          },
+          "required": ["A", "B", "C", "D"]
+        },
+        "correctAnswer": {
+          "type": "string",
+          "enum": ["A", "B", "C", "D"],
+          "description": "Kunci jawaban benar"
+        },
+        "explanation": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Pembahasan rinci jawaban"
+        },
+        "difficulty": {
+          "type": "string",
+          "enum": ["Mudah", "Sedang", "Sulit"],
+          "description": "Tingkat kesulitan soal"
+        }
+      },
+      "required": ["id", "subjectId", "question", "options", "correctAnswer", "explanation"]
+    },
+    "QuizResult": {
+      "title": "QuizResult",
+      "description": "Lembar rekap nilai hasil ujian siswa",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "ID unik hasil kuis"
+        },
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "UID pengguna yang mengerjakan"
+        },
+        "studentName": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Nama siswa"
+        },
+        "studentClass": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Kelas siswa"
+        },
+        "studentNis": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Nomor absen atau NIS siswa"
+        },
+        "subjectId": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "ID mata pelajaran"
+        },
+        "subjectName": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Nama mata pelajaran"
+        },
+        "teacherName": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Nama guru pengampu"
+        },
+        "totalQuestions": {
+          "type": "number",
+          "description": "Total soal yang dikerjakan"
+        },
+        "correctAnswers": {
+          "type": "number",
+          "description": "Jumlah jawaban benar"
+        },
+        "wrongAnswers": {
+          "type": "number",
+          "description": "Jumlah jawaban salah"
+        },
+        "unanswered": {
+          "type": "number",
+          "description": "Jumlah soal belum dijawab"
+        },
+        "score": {
+          "type": "number",
+          "description": "Nilai akhir (0-100)"
+        },
+        "passed": {
+          "type": "boolean",
+          "description": "Status kelulusan KKM"
+        },
+        "passingGrade": {
+          "type": "number",
+          "description": "Nilai KKM batas tuntas"
+        },
+        "timeSpentSeconds": {
+          "type": "number",
+          "description": "Durasi pengerjaan dalam detik"
+        },
+        "timestamp": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Waktu pengerjaan (ISO string)"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Waktu penyimpanan di server"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "studentName",
+        "studentClass",
+        "subjectId",
+        "subjectName",
+        "totalQuestions",
+        "score",
+        "passed",
+        "passingGrade",
+        "timeSpentSeconds"
+      ]
+    }
+  },
+  "firestore": {
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "Koleksi akun administrator dan guru pengampu ujian"
+    },
+    "/subjects/{subjectId}": {
+      "schema": "Subject",
+      "description": "Koleksi mata pelajaran ujian sekolah"
+    },
+    "/questions/{questionId}": {
+      "schema": "Question",
+      "description": "Koleksi bank butir soal pilihan ganda"
+    },
+    "/results/{resultId}": {
+      "schema": "QuizResult",
+      "description": "Koleksi lembar rekap nilai ujian siswa"
+    }
+  }
+}
