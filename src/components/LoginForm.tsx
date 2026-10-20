@@ -26,6 +26,11 @@ import {
   BookOpen,
   FileSpreadsheet,
   HelpCircle,
+  GraduationCap,
+  Lock,
+  Unlock,
+  LogIn,
+  ShieldCheck,
 } from 'lucide-react';
 import { soundManager } from '../utils/sound';
 import { useFirebase } from '../context/FirebaseContext';
@@ -52,6 +57,8 @@ const COMMON_CLASSES = [
   '10 MIPA 1', '10 IPS 1', '11 MIPA 1', '12 MIPA 1'
 ];
 
+const AVATAR_LIST = ['🧑‍🎓', '👩‍🎓', '🎓', '🌟', '🎒', '💡', '🦁', '🚀'];
+
 export const LoginForm: React.FC<LoginFormProps> = ({
   subjects,
   questions,
@@ -62,7 +69,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   latestResult,
   onViewLatestResult,
 }) => {
-  const { isConnected, user } = useFirebase();
+  const { isConnected, user, loginWithGoogle } = useFirebase();
 
   // Load remembered student info (name & no absen)
   const savedStudent = getLastStudentInfo();
@@ -73,6 +80,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   const [studentClass, setStudentClass] = useState<string>(savedStudent.studentClass || '8A');
   const [showClassEditor, setShowClassEditor] = useState<boolean>(false);
   const [isCustomClass, setIsCustomClass] = useState<boolean>(false);
+  const [selectedAvatar, setSelectedAvatar] = useState<string>('🧑‍🎓');
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(
     subjects[0]?.id || 'matematika'
@@ -312,47 +320,124 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       )}
 
       {/* Kartu Utama: Layar Depan Login Ujian Siswa */}
-      <div className="backdrop-blur-xl bg-white/75 border border-white/80 rounded-3xl p-6 sm:p-9 shadow-xl relative overflow-hidden">
-        {/* Dekorasi Aksen */}
-        <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500" />
+      <div className="backdrop-blur-xl bg-white/85 border border-white/90 rounded-3xl p-6 sm:p-9 shadow-2xl relative overflow-hidden">
+        {/* Dekorasi Aksen Warna */}
+        <div className="absolute top-0 inset-x-0 h-2.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500" />
         
-        {/* Header Kartu Login */}
-        <div className="text-center max-w-lg mx-auto mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600/10 border border-indigo-200/60 text-indigo-700 mb-3 shadow-xs">
-            <User className="w-7 h-7" />
+        {/* Header Kartu Login / Gerbang Masuk */}
+        <div className="text-center max-w-xl mx-auto mb-7">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-gradient-to-br from-indigo-600 to-indigo-700 text-white mb-3.5 shadow-lg shadow-indigo-500/25">
+            <GraduationCap className="w-8 h-8" />
           </div>
-          <span className="text-xs font-extrabold tracking-widest uppercase text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-3 py-0.5 rounded-full inline-block mb-1.5 shadow-2xs">
-            Layar Masuk Ujian Siswa
-          </span>
+          <div className="flex items-center justify-center gap-2 mb-1.5 flex-wrap">
+            <span className="text-[11px] font-black tracking-widest uppercase text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-0.5 rounded-full shadow-2xs">
+              Portal Akses Masuk Siswa CBT
+            </span>
+            <div
+              className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-bold border transition ${
+                isConnected
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : 'bg-amber-50 text-amber-800 border-amber-200'
+              }`}
+              title="Koneksi Cloud Firestore Database untuk sinkronisasi nilai otomatis"
+            >
+              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+              <Database className="w-3 h-3 text-emerald-600" />
+              <span>{isConnected ? 'Database Cloud Terhubung' : 'Menghubungkan DB...'}</span>
+            </div>
+          </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            Portal Ujian Siswa
+            Selamat Datang di Ruang Ujian
           </h1>
-          <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-bold text-emerald-800">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <Database className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Database Cloud Firestore Terhubung</span>
-          </div>
-          <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">
-            Murid cukup memasukkan <strong>Nama Lengkap</strong> dan <strong>Nomor Absensi</strong> untuk mulai mengerjakan lembar ujian CBT.
+          <p className="text-xs sm:text-sm text-slate-600 mt-1.5 leading-relaxed">
+            Silakan masukkan <strong>Nama Lengkap</strong> Anda dan <strong>Nomor Absensi</strong> untuk membuka lembar ujian dan mencatat evaluasi belajar.
           </p>
+        </div>
+
+        {/* Live Kartu Tanda Peserta Ujian Preview */}
+        <div className="max-w-2xl mx-auto mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 text-white shadow-lg border border-indigo-500/30 relative overflow-hidden">
+          <div className="absolute top-0 right-0 -mt-4 -mr-4 w-28 h-28 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative z-10">
+            <div className="flex items-center gap-3.5">
+              {/* Avatar Selector */}
+              <div className="relative group">
+                <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-3xl shadow-inner cursor-pointer hover:scale-105 transition-transform">
+                  {selectedAvatar}
+                </div>
+                <span className="absolute -bottom-1 -right-1 text-[9px] bg-indigo-500 text-white font-bold px-1.5 py-0.2 rounded-md border border-white/40">
+                  Ubah
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-indigo-300 bg-indigo-500/30 px-2 py-0.5 rounded-md border border-indigo-400/30">
+                  Kartu Peserta Ujian
+                </span>
+                <h3 className="text-base sm:text-lg font-black text-white mt-0.5 flex items-center gap-2">
+                  <span>{name.trim() ? name.trim() : 'Nama Siswa Belum Diisi'}</span>
+                  {name.trim().length >= 2 && (
+                    <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-full font-bold">
+                      ✓ Siap
+                    </span>
+                  )}
+                </h3>
+                <p className="text-xs text-slate-300 mt-0.5 flex items-center gap-2 flex-wrap">
+                  <span>No. Absen: <strong>{noAbsen.trim() || '-'}</strong></span>
+                  <span>•</span>
+                  <span>Kelas: <strong>{studentClass}</strong></span>
+                  <span>•</span>
+                  <span className="text-amber-300">Mapel: <strong>{activeSubject.name}</strong></span>
+                </p>
+              </div>
+            </div>
+
+            {/* Avatar Quick Switcher */}
+            <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10 self-end sm:self-auto">
+              {AVATAR_LIST.map((av) => (
+                <button
+                  key={av}
+                  type="button"
+                  onClick={() => {
+                    setSelectedAvatar(av);
+                    soundManager.playSelect();
+                  }}
+                  className={`w-7 h-7 rounded-lg text-sm flex items-center justify-center transition cursor-pointer ${
+                    selectedAvatar === av
+                      ? 'bg-indigo-600 scale-110 shadow-sm'
+                      : 'hover:bg-white/10 opacity-75 hover:opacity-100'
+                  }`}
+                  title="Pilih Avatar Profil Ujian"
+                >
+                  {av}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Form Login Murid */}
         <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl mx-auto">
           {/* Bagian Input: Nama & No. Absensi */}
-          <div className="bg-slate-50/80 rounded-2xl p-5 sm:p-6 border border-slate-200/80 space-y-4">
+          <div className="bg-slate-50/90 rounded-2xl p-5 sm:p-6 border border-slate-200/90 space-y-4 shadow-2xs">
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
               {/* 1. Nama Lengkap Siswa */}
               <div className="sm:col-span-8">
                 <label
                   htmlFor="student-name"
-                  className="block text-xs font-extrabold text-slate-800 mb-1.5 flex items-center justify-between"
+                  className="block text-xs font-black text-slate-800 mb-1.5 flex items-center justify-between"
                 >
                   <span className="flex items-center gap-1.5">
                     <User className="w-4 h-4 text-indigo-600" />
                     Nama Lengkap Siswa
                   </span>
-                  <span className="text-[11px] text-rose-600 font-bold">*Wajib Diisi</span>
+                  {name.trim().length >= 2 ? (
+                    <span className="text-[11px] text-emerald-600 font-extrabold flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Nama Terisi ✓
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-rose-600 font-extrabold">*Wajib Diisi untuk Masuk</span>
+                  )}
                 </label>
                 <div className="relative">
                   <input
@@ -360,25 +445,54 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                     type="text"
                     required
                     autoFocus
-                    placeholder="Masukkan nama lengkap Anda..."
+                    placeholder="Ketik nama lengkap Anda (contoh: Siti Nurhaliza)..."
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full pl-3.5 pr-4 py-3 rounded-xl border border-slate-300 bg-white text-sm sm:text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs transition placeholder:font-normal placeholder:text-slate-400"
+                    className="w-full pl-3.5 pr-9 py-3 rounded-xl border border-slate-300 bg-white text-sm sm:text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs transition placeholder:font-normal placeholder:text-slate-400"
                   />
+                  {name.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setName('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                      title="Hapus Nama"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
+
+                {/* Quick chip for remembered name */}
+                {savedStudent.name && savedStudent.name !== name && (
+                  <div className="mt-2 flex items-center gap-2 text-xs">
+                    <span className="text-slate-500 text-[11px]">Nama Terakhir:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setName(savedStudent.name);
+                        if (savedStudent.noAbsen) setNoAbsen(savedStudent.noAbsen);
+                        if (savedStudent.studentClass) setStudentClass(savedStudent.studentClass);
+                        soundManager.playSelect();
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 cursor-pointer text-[11px] transition"
+                    >
+                      <span>💡 Gunakan "{savedStudent.name}"</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* 2. Nomor Absensi */}
               <div className="sm:col-span-4">
                 <label
                   htmlFor="student-no-absen"
-                  className="block text-xs font-extrabold text-slate-800 mb-1.5 flex items-center justify-between"
+                  className="block text-xs font-black text-slate-800 mb-1.5 flex items-center justify-between"
                 >
                   <span className="flex items-center gap-1.5">
                     <Hash className="w-4 h-4 text-emerald-600" />
                     No. Absensi
                   </span>
-                  <span className="text-[11px] text-rose-600 font-bold">*Wajib</span>
+                  <span className="text-[11px] text-rose-600 font-extrabold">*Wajib</span>
                 </label>
                 <input
                   id="student-no-absen"
@@ -394,13 +508,16 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
             {/* Quick helper for No Absen */}
             <div className="flex items-center justify-between text-[11px] text-slate-500 flex-wrap gap-2 pt-1 border-t border-slate-200/60">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="font-semibold text-slate-600">Pilih Cepat Absen:</span>
-                {[1, 2, 5, 10, 15, 20, 25, 30].map((num) => (
+                {[1, 2, 3, 4, 5, 10, 15, 20, 25, 30].map((num) => (
                   <button
                     key={num}
                     type="button"
-                    onClick={() => setNoAbsen(String(num))}
+                    onClick={() => {
+                      setNoAbsen(String(num));
+                      soundManager.playSelect();
+                    }}
                     className={`px-2 py-0.5 rounded-md font-bold text-[10px] border transition cursor-pointer ${
                       noAbsen === String(num)
                         ? 'bg-indigo-600 text-white border-indigo-600'
@@ -709,14 +826,69 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             <button
               id="btn-start-quiz"
               type="submit"
-              className="w-full py-4 px-6 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-2xl font-black text-base shadow-xl shadow-indigo-300 hover:shadow-2xl transition-all flex items-center justify-center gap-2.5 cursor-pointer group"
+              className={`w-full py-4 px-6 rounded-2xl font-black text-base shadow-xl transition-all flex items-center justify-center gap-3 cursor-pointer group ${
+                name.trim().length >= 2
+                  ? 'bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 hover:from-indigo-500 hover:to-purple-600 text-white shadow-indigo-400/40 hover:shadow-2xl scale-[1.01] active:scale-[0.99]'
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-300'
+              }`}
             >
-              <Play className="w-5 h-5 fill-white group-hover:translate-x-0.5 transition-transform" />
-              <span>MASUK & MULAI UJIAN SEKARANG</span>
+              {name.trim().length >= 2 ? (
+                <>
+                  <Unlock className="w-5 h-5 text-emerald-300 group-hover:scale-110 transition-transform" />
+                  <span>
+                    MASUK KE APLIKASI SEBAGAI "{name.trim().toUpperCase()}"
+                  </span>
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </>
+              ) : (
+                <>
+                  <Play className="w-5 h-5 fill-white group-hover:translate-x-0.5 transition-transform" />
+                  <span>MASUK & MULAI UJIAN SEKARANG</span>
+                </>
+              )}
             </button>
-            <p className="text-center text-[11px] text-slate-500 mt-2">
-              ✨ Begitu menekan tombol, ruang ujian CBT dibuka dan penghitung waktu akan mulai berjalan otomatis.
+            <p className="text-center text-[11px] text-slate-500 mt-2.5">
+              ✨ Begitu menekan tombol masuk, sesi CBT Anda dimulai dan lembar soal dibuka dengan durasi {totalQuizMinutes} menit.
             </p>
+          </div>
+
+          {/* Quick Access Guru / Pengawas */}
+          <div className="mt-6 pt-5 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs bg-slate-50/70 p-3.5 rounded-2xl">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-indigo-600" />
+              <span className="font-bold text-slate-700">
+                Pengawas atau Guru Pengampu?
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {!user ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await loginWithGoogle();
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-800 font-bold border border-slate-300 shadow-2xs flex items-center gap-1.5 cursor-pointer text-[11px]"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Login Akun Guru (Google)</span>
+                </button>
+              ) : (
+                <span className="font-bold text-emerald-700 text-[11px] flex items-center gap-1">
+                  ✓ Guru Terhubung: {user.displayName || user.email}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={onOpenRekap}
+                className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 cursor-pointer text-[11px]"
+              >
+                Rekap Nilai Siswa
+              </button>
+            </div>
           </div>
         </form>
       </div>
