@@ -5,6 +5,7 @@ import {
   Question,
   QuizSettings,
   QuizResult,
+  PortalRole,
 } from '../types';
 import { SubjectIcon } from './SubjectIcon';
 import {
@@ -30,11 +31,21 @@ import {
   Lock,
   Unlock,
   LogIn,
+  LogOut,
   ShieldCheck,
+  Cloud,
+  Check,
+  AlertCircle,
+  KeyRound,
+  ExternalLink,
+  Sparkle,
+  ClipboardList,
+  Users,
+  Shield,
+  Database,
 } from 'lucide-react';
 import { soundManager } from '../utils/sound';
 import { useFirebase } from '../context/FirebaseContext';
-import { Database } from 'lucide-react';
 import { getLastStudentInfo, saveLastStudentInfo } from '../utils/storage';
 
 interface LoginFormProps {
@@ -52,9 +63,33 @@ interface LoginFormProps {
   onViewLatestResult?: (result: QuizResult) => void;
 }
 
+export const GRADE_OPTIONS = [
+  { label: 'Kelas X', value: 'X', level: 'SMA/SMK' },
+  { label: 'Kelas XI', value: 'XI', level: 'SMA/SMK' },
+  { label: 'Kelas XII', value: 'XII', level: 'SMA/SMK' },
+  { label: 'Kelas 9', value: '9', level: 'SMP' },
+  { label: 'Kelas 8', value: '8', level: 'SMP' },
+  { label: 'Kelas 7', value: '7', level: 'SMP' },
+];
+
+export const MAJOR_OPTIONS = [
+  { id: 'MIPA', label: 'MIPA / IPA' },
+  { id: 'IPS', label: 'IPS' },
+  { id: 'Bahasa', label: 'Bahasa' },
+  { id: 'RPL', label: 'RPL (Software)' },
+  { id: 'TKJ', label: 'TKJ (Jaringan)' },
+  { id: 'AKL', label: 'Akuntansi (AKL)' },
+  { id: 'DKV', label: 'DKV / Multimedia' },
+  { id: 'OTKP', label: 'Perkantoran (OTKP)' },
+];
+
+export const ROMBEL_OPTIONS = ['1', '2', '3', '4', 'A', 'B'];
+
 const COMMON_CLASSES = [
-  '7A', '7B', '8A', '8B', '9A', '9B',
-  '10 MIPA 1', '10 IPS 1', '11 MIPA 1', '12 MIPA 1'
+  'X MIPA 1', 'X MIPA 2', 'X IPS 1', 'X RPL 1', 'X TKJ 1',
+  'XI MIPA 1', 'XI IPS 1', 'XI RPL 1', 'XI TKJ 1',
+  'XII MIPA 1', 'XII IPS 1', 'XII RPL 1', 'XII TKJ 1',
+  '7A', '7B', '8A', '8B', '9A', '9B'
 ];
 
 const AVATAR_LIST = ['🧑‍🎓', '👩‍🎓', '🎓', '🌟', '🎒', '💡', '🦁', '🚀'];
@@ -69,18 +104,82 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   latestResult,
   onViewLatestResult,
 }) => {
-  const { isConnected, user, loginWithGoogle } = useFirebase();
+  const {
+    user,
+    studentProfile,
+    isAdmin,
+    isStudent,
+    isTeacher,
+    loginStudent,
+    loginTeacher,
+    updateStudentProfile,
+    logout,
+  } = useFirebase();
+
+  // Portal foreground login state (matching user screenshot)
+  const [isLoggedInToPortal, setIsLoggedInToPortal] = useState<boolean>(false);
+  const [selectedRole, setSelectedRole] = useState<PortalRole>('siswa');
+  const [nisnInput, setNisnInput] = useState<string>('');
+  const [passwordInput, setPasswordInput] = useState<string>('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(false);
 
   // Load remembered student info (name & no absen)
   const savedStudent = getLastStudentInfo();
 
-  // Student Form State - Only Name & No. Absensi are required!
+  // Student Form State - Default to High School Class X MIPA 1
   const [name, setName] = useState<string>(savedStudent.name || '');
   const [noAbsen, setNoAbsen] = useState<string>(savedStudent.noAbsen || '');
-  const [studentClass, setStudentClass] = useState<string>(savedStudent.studentClass || '8A');
+  const [studentClass, setStudentClass] = useState<string>(savedStudent.studentClass || 'X MIPA 1');
   const [showClassEditor, setShowClassEditor] = useState<boolean>(false);
   const [isCustomClass, setIsCustomClass] = useState<boolean>(false);
   const [selectedAvatar, setSelectedAvatar] = useState<string>('🧑‍🎓');
+
+  // Grade & Major Builder State (X, XI, XII & Jurusan Mandiri)
+  const [selectedGrade, setSelectedGrade] = useState<string>('X');
+  const [selectedMajor, setSelectedMajor] = useState<string>('MIPA');
+  const [customMajor, setCustomMajor] = useState<string>('');
+  const [selectedRombel, setSelectedRombel] = useState<string>('1');
+  const [isCustomMajorActive, setIsCustomMajorActive] = useState<boolean>(false);
+
+  // Helper to dynamically compose studentClass from Grade, Major, and Rombel
+  const updateBuiltClass = (
+    grade: string,
+    major: string,
+    rombel: string,
+    isCustom: boolean,
+    customText: string
+  ) => {
+    let result = '';
+    const activeMajor = isCustom ? customText.trim() : major;
+    if (grade) {
+      result = grade;
+      if (activeMajor) {
+        result += ` ${activeMajor}`;
+      }
+      if (rombel) {
+        result += ` ${rombel}`;
+      }
+    } else if (activeMajor) {
+      result = activeMajor;
+      if (rombel) result += ` ${rombel}`;
+    }
+    if (result.trim()) {
+      setStudentClass(result.trim());
+    }
+  };
+
+  // Auto-sync form when student profile is loaded from Firestore
+  useEffect(() => {
+    if (studentProfile) {
+      if (studentProfile.name) setName(studentProfile.name);
+      if (studentProfile.noAbsen) setNoAbsen(studentProfile.noAbsen);
+      if (studentProfile.studentClass) setStudentClass(studentProfile.studentClass);
+      if (studentProfile.avatar) setSelectedAvatar(studentProfile.avatar);
+    } else if (user && !isAdmin && user.displayName && !name) {
+      setName(user.displayName);
+    }
+  }, [studentProfile, user, isAdmin]);
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(
     subjects[0]?.id || 'matematika'
@@ -165,6 +264,83 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     setShowTeacherQuickModal(false);
   };
 
+  // Handlers for Portal Login
+  const handlePortalLogin = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setAuthError(null);
+
+    if (selectedRole === 'siswa') {
+      const trimmedName = name.trim();
+      const trimmedClass = studentClass.trim();
+      if (!trimmedName) {
+        setAuthError('Silakan masukkan Nama Lengkap Anda.');
+        return;
+      }
+      if (!trimmedClass) {
+        setAuthError('Silakan masukkan atau pilih Kelas Anda.');
+        return;
+      }
+      const resolvedAbsen = noAbsen.trim() || '1';
+      setName(trimmedName);
+      setStudentClass(trimmedClass);
+      setNoAbsen(resolvedAbsen);
+      saveLastStudentInfo({
+        name: trimmedName,
+        noAbsen: resolvedAbsen,
+        studentClass: trimmedClass,
+      });
+      soundManager.playCorrect();
+      setIsLoggedInToPortal(true);
+    } else if (selectedRole === 'guru') {
+      soundManager.playCorrect();
+      onOpenBankSoal();
+    }
+  };
+
+  const handleAdminLogin = async () => {
+    setIsLoadingAuth(true);
+    setAuthError(null);
+    try {
+      if (!user) {
+        await loginTeacher();
+      }
+      soundManager.playCorrect();
+      onOpenRekap();
+    } catch {
+      soundManager.playCorrect();
+      onOpenRekap();
+    } finally {
+      setIsLoadingAuth(false);
+    }
+  };
+
+  const handleGooglePortalLogin = async () => {
+    setIsLoadingAuth(true);
+    setAuthError(null);
+    try {
+      if (selectedRole === 'siswa') {
+        const res = await loginStudent({
+          name: name.trim() || undefined,
+          studentClass: studentClass.trim() || undefined,
+          noAbsen: noAbsen.trim() || undefined,
+        });
+        setName(res.profile.name);
+        if (res.profile.studentClass) setStudentClass(res.profile.studentClass);
+        if (res.profile.noAbsen) setNoAbsen(res.profile.noAbsen);
+        soundManager.playCorrect();
+        setIsLoggedInToPortal(true);
+      } else {
+        await loginTeacher();
+        soundManager.playCorrect();
+        onOpenBankSoal();
+      }
+    } catch {
+      setAuthError('Gagal autentikasi Google. Silakan coba lagi.');
+    } finally {
+      setIsLoadingAuth(false);
+    }
+  };
+
   // Student Login & Start Quiz Handler
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,6 +370,16 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       studentClass: studentClass.trim() || '8A',
     });
 
+    // If logged in as student, update student profile in Firestore
+    if (user && isStudent) {
+      updateStudentProfile({
+        name: name.trim(),
+        noAbsen: noAbsen.trim(),
+        studentClass: studentClass.trim() || '8A',
+        avatar: selectedAvatar,
+      });
+    }
+
     // Calculate effective question count
     let targetCount = subjectQuestions.length;
     if (questionCountMode === 'teacher_preset') {
@@ -221,27 +407,448 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         name: name.trim(),
         studentClass: studentClass.trim() || '8A',
         nis: `No. Absen: ${noAbsen.trim()}`,
+        email: user?.email || undefined,
+        avatar: selectedAvatar,
       },
       activeSubject,
       settings
     );
   };
 
+  if (!isLoggedInToPortal) {
+    return (
+      <div className="min-h-[85vh] flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-100 text-slate-800 animate-in fade-in duration-300">
+          {/* Header */}
+          <div className="text-center mb-6">
+            <h1 className="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight">
+              Selamat Datang Kembali
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1.5 font-medium">
+              Pilih hak akses portal Anda di bawah ini:
+            </p>
+          </div>
+
+          {/* 2-Column Grid of Role Cards: Siswa & Guru */}
+          <div className="grid grid-cols-2 gap-3.5 mb-6">
+            {/* 1. Siswa / Murid */}
+            <div
+              onClick={() => {
+                setSelectedRole('siswa');
+                soundManager.playSelect();
+              }}
+              className={`p-4 rounded-2xl text-left transition-all cursor-pointer select-none ${
+                selectedRole === 'siswa'
+                  ? 'border-2 border-[#1E6BFF] bg-blue-50/20 ring-2 ring-blue-500/15 shadow-sm'
+                  : 'border border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
+              }`}
+            >
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2.5 transition-colors ${
+                  selectedRole === 'siswa'
+                    ? 'bg-[#1E6BFF] text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 border border-slate-200/60'
+                }`}
+              >
+                <User className="w-5 h-5" />
+              </div>
+              <h3 className="text-sm font-black text-slate-900 leading-tight">
+                Siswa /<br />Murid
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">
+                Masuk dengan nama & kelas untuk ujian dan evaluasi belajar.
+              </p>
+            </div>
+
+            {/* 2. Guru Pengajar */}
+            <div
+              onClick={() => {
+                setSelectedRole('guru');
+                soundManager.playSelect();
+              }}
+              className={`p-4 rounded-2xl text-left transition-all cursor-pointer select-none ${
+                selectedRole === 'guru'
+                  ? 'border-2 border-[#1E6BFF] bg-blue-50/20 ring-2 ring-blue-500/15 shadow-sm'
+                  : 'border border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
+              }`}
+            >
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2.5 transition-colors ${
+                  selectedRole === 'guru'
+                    ? 'bg-[#1E6BFF] text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 border border-slate-200/60'
+                }`}
+              >
+                <BookOpen className="w-5 h-5" />
+              </div>
+              <h3 className="text-sm font-black text-slate-900 leading-tight">
+                Guru<br />Pengajar
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">
+                Bank soal, buat materi ujian, & kelola presensi siswa.
+              </p>
+            </div>
+          </div>
+
+          {/* Error notification */}
+          {authError && (
+            <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{authError}</span>
+            </div>
+          )}
+
+          {/* Form Inputs */}
+          <form onSubmit={handlePortalLogin} className="space-y-4">
+            {selectedRole === 'siswa' ? (
+              <>
+                {/* Field 1: Nama Lengkap Siswa */}
+                <div>
+                  <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-1.5 block">
+                    NAMA LENGKAP SISWA
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Masukkan Nama Lengkap Anda"
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E6BFF] focus:ring-2 focus:ring-blue-500/20 shadow-2xs transition"
+                    />
+                  </div>
+                </div>
+
+                {/* Field 2: Kelas & Jurusan (Bisa Pilih Mandiri) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 block">
+                      KELAS & JURUSAN
+                    </label>
+                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                      Pilihan Mandiri
+                    </span>
+                  </div>
+
+                  {/* Input Kelas Terpadu */}
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                      <School className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={studentClass}
+                      onChange={(e) => setStudentClass(e.target.value)}
+                      placeholder="Contoh: X MIPA 1 / XI RPL 2 / XII IPS"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E6BFF] focus:ring-2 focus:ring-blue-500/20 shadow-2xs transition"
+                    />
+                  </div>
+
+                  {/* Card Pilihan Cepat: Tingkat X, XI, XII & Jurusan Mandiri */}
+                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2.5 text-left text-xs">
+                    {/* 1. Tingkat Kelas: X, XI, XII (SMA/SMK) & SMP */}
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                        <span>1. Tingkat Kelas</span>
+                        <span className="text-[10px] text-blue-600 font-semibold">Tingkat X, XI, XII</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {GRADE_OPTIONS.map((g) => {
+                          const isHighSchool = g.value.startsWith('X');
+                          const isActive = selectedGrade === g.value;
+                          return (
+                            <button
+                              key={g.value}
+                              type="button"
+                              onClick={() => {
+                                setSelectedGrade(g.value);
+                                updateBuiltClass(g.value, selectedMajor, selectedRombel, isCustomMajorActive, customMajor);
+                              }}
+                              className={`text-xs px-2.5 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${
+                                isActive
+                                  ? 'bg-[#1E6BFF] text-white shadow-xs'
+                                  : isHighSchool
+                                  ? 'bg-white text-blue-900 border border-blue-200 hover:bg-blue-50'
+                                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                              }`}
+                            >
+                              <span>{g.label}</span>
+                              {isHighSchool && (
+                                <span className={`text-[9px] px-1 rounded font-semibold ${isActive ? 'bg-blue-700 text-white' : 'bg-blue-50 text-blue-600'}`}>
+                                  SMA
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 2. Jurusan (Bisa Pilih Mandiri) */}
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                        <span>2. Jurusan (Pilih Mandiri)</span>
+                        <span className="text-[10px] text-emerald-600 font-bold">Bebas Pilih</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {MAJOR_OPTIONS.map((m) => {
+                          const isActive = !isCustomMajorActive && selectedMajor === m.id;
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => {
+                                setIsCustomMajorActive(false);
+                                setSelectedMajor(m.id);
+                                updateBuiltClass(selectedGrade, m.id, selectedRombel, false, customMajor);
+                              }}
+                              className={`text-xs px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                                isActive
+                                  ? 'bg-[#1E6BFF] text-white shadow-xs font-bold'
+                                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium'
+                              }`}
+                            >
+                              {m.label}
+                            </button>
+                          );
+                        })}
+
+                        {/* Tombol Tulis Jurusan Mandiri */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextState = !isCustomMajorActive;
+                            setIsCustomMajorActive(nextState);
+                            if (nextState && customMajor.trim()) {
+                              updateBuiltClass(selectedGrade, selectedMajor, selectedRombel, true, customMajor);
+                            }
+                          }}
+                          className={`text-xs px-2.5 py-1 rounded-lg border transition cursor-pointer flex items-center gap-1 ${
+                            isCustomMajorActive
+                              ? 'bg-amber-500 text-white border-amber-600 shadow-xs font-bold'
+                              : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100 font-bold'
+                          }`}
+                        >
+                          <Edit className="w-3 h-3" />
+                          <span>+ Tulis Mandiri</span>
+                        </button>
+                      </div>
+
+                      {/* Input Khusus jika memilih Tulis Mandiri */}
+                      {isCustomMajorActive && (
+                        <div className="mt-2 p-2.5 bg-amber-50/90 rounded-xl border border-amber-200 space-y-1.5 animate-in fade-in duration-200">
+                          <label className="text-[10px] font-bold text-amber-900 block">
+                            Ketik Nama Jurusan Mandiri Anda:
+                          </label>
+                          <div className="flex gap-1.5">
+                            <input
+                              type="text"
+                              value={customMajor}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setCustomMajor(val);
+                                updateBuiltClass(selectedGrade, selectedMajor, selectedRombel, true, val);
+                              }}
+                              placeholder="Contoh: Tata Boga, Farmasi, Teknik Mesin, Desain Grafis"
+                              className="flex-1 px-3 py-1.5 text-xs bg-white rounded-lg border border-amber-300 font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                            />
+                            {customMajor && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  updateBuiltClass(selectedGrade, selectedMajor, selectedRombel, true, customMajor);
+                                }}
+                                className="px-2.5 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer"
+                              >
+                                Terapkan
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-amber-700">
+                            Jurusan apa pun dari sekolah Anda dapat dimasukkan secara mandiri.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 3. Nomor / Rombel Kelas */}
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center justify-between">
+                        <span>3. Nomor Kelas / Rombel</span>
+                        <span className="text-[10px] text-slate-400 font-normal">Opsional</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {ROMBEL_OPTIONS.map((r) => {
+                          const isActive = selectedRombel === r;
+                          return (
+                            <button
+                              key={r}
+                              type="button"
+                              onClick={() => {
+                                const nextR = isActive ? '' : r;
+                                setSelectedRombel(nextR);
+                                updateBuiltClass(selectedGrade, selectedMajor, nextR, isCustomMajorActive, customMajor);
+                              }}
+                              className={`text-xs w-7 h-7 rounded-lg font-bold transition cursor-pointer flex items-center justify-center ${
+                                isActive
+                                  ? 'bg-slate-900 text-white shadow-xs'
+                                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                              }`}
+                            >
+                              {r}
+                            </button>
+                          );
+                        })}
+                        {selectedRombel && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedRombel('');
+                              updateBuiltClass(selectedGrade, selectedMajor, '', isCustomMajorActive, customMajor);
+                            }}
+                            className="text-[10px] text-slate-500 hover:text-slate-700 underline ml-1 cursor-pointer"
+                          >
+                            Hapus Rombel
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Field 3: Nomor Absen (Opsional) */}
+                <div>
+                  <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-1.5 block">
+                    NOMOR ABSEN <span className="text-slate-400 font-normal text-[10px]">(OPSIONAL)</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                      <Hash className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="text"
+                      value={noAbsen}
+                      onChange={(e) => setNoAbsen(e.target.value)}
+                      placeholder="Contoh: 14"
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E6BFF] focus:ring-2 focus:ring-blue-500/20 shadow-2xs transition"
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Guru Inputs */}
+                <div>
+                  <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-1.5 block">
+                    NAMA / EMAIL GURU
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={nisnInput}
+                      onChange={(e) => setNisnInput(e.target.value)}
+                      placeholder="Masukkan Nama atau Email Guru"
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E6BFF] focus:ring-2 focus:ring-blue-500/20 shadow-2xs transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-1.5 block">
+                    PASSWORD
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="password"
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
+                      placeholder="Password (Opsional)"
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E6BFF] focus:ring-2 focus:ring-blue-500/20 shadow-2xs transition"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Submit Button: Masuk Portal */}
+            <button
+              type="submit"
+              disabled={isLoadingAuth}
+              className="w-full py-3.5 px-4 rounded-xl bg-[#1E6BFF] hover:bg-blue-600 active:bg-blue-700 text-white font-bold text-sm shadow-md shadow-blue-500/25 transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <span>{isLoadingAuth ? 'Memproses...' : 'Masuk Portal'}</span>
+            </button>
+
+            {/* Quick Google Sign In */}
+            <div className="pt-2 text-center">
+              <button
+                type="button"
+                onClick={handleGooglePortalLogin}
+                disabled={isLoadingAuth}
+                className="w-full py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                </svg>
+                <span>Masuk Cepat dengan Akun Google (Cloud DB)</span>
+              </button>
+            </div>
+
+            {/* Footer with Login Administrator */}
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3 text-xs">
+              <span className="text-slate-500 text-xs">Halaman khusus pengelola:</span>
+              <button
+                type="button"
+                onClick={handleAdminLogin}
+                className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs border border-slate-200/80 flex items-center gap-2 cursor-pointer transition"
+              >
+                <Shield className="w-4 h-4 text-slate-600" />
+                <span>Login Administrator</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 sm:py-8 space-y-6 sm:space-y-8">
-      {/* Top Bar / Header Navigasi Guru */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-md shadow-indigo-200">
-            <BookOpen className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
-              CBT Ujian Sekolah
+      {/* Top Bar / Header Navigasi Ujian */}
+      <div className="flex items-center justify-between gap-3 flex-wrap bg-white/80 backdrop-blur-xl p-3.5 sm:p-4 rounded-2xl border border-white/90 shadow-xs">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              soundManager.playSelect();
+              setIsLoggedInToPortal(false);
+            }}
+            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold border border-slate-200 flex items-center gap-1.5 transition cursor-pointer"
+            title="Kembali ke layar pilihan hak akses portal"
+          >
+            <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+            <span>Ganti Peran / Keluar</span>
+          </button>
+          <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-xs font-bold text-slate-800">
+              Siswa: <strong className="text-blue-700">{name || savedStudent.name || 'Siswa CBT'}</strong> ({studentClass})
             </span>
-            <h2 className="text-sm font-extrabold text-slate-800">
-              Aplikasi Evaluasi Belajar Siswa
-            </h2>
           </div>
         </div>
 
@@ -249,7 +856,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
           <button
             type="button"
             onClick={onOpenBankSoal}
-            className="text-xs font-bold text-slate-700 hover:text-indigo-700 bg-white/70 hover:bg-white px-3 py-2 rounded-xl border border-white/80 shadow-xs backdrop-blur-xs transition flex items-center gap-1.5 cursor-pointer"
+            className="text-xs font-bold text-slate-700 hover:text-indigo-700 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
             title="Kelola butir soal dan ketetapan guru"
           >
             <span>📚 Bank Soal ({questions.length})</span>
@@ -257,10 +864,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({
           <button
             type="button"
             onClick={onOpenRekap}
-            className="text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3.5 py-2 rounded-xl border border-indigo-200 shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            className="text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3.5 py-1.5 rounded-xl border border-indigo-200 shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
             title="Lihat rekapitulasi nilai ujian seluruh siswa"
           >
-            <FileSpreadsheet className="w-4 h-4 text-indigo-600" />
+            <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600" />
             <span>Rekap Nilai Guru</span>
           </button>
         </div>
@@ -319,107 +926,41 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         </div>
       )}
 
-      {/* Kartu Utama: Layar Depan Login Ujian Siswa */}
-      <div className="backdrop-blur-xl bg-white/85 border border-white/90 rounded-3xl p-6 sm:p-9 shadow-2xl relative overflow-hidden">
-        {/* Dekorasi Aksen Warna */}
-        <div className="absolute top-0 inset-x-0 h-2.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500" />
-        
-        {/* Header Kartu Login / Gerbang Masuk */}
-        <div className="text-center max-w-xl mx-auto mb-7">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-gradient-to-br from-indigo-600 to-indigo-700 text-white mb-3.5 shadow-lg shadow-indigo-500/25">
-            <GraduationCap className="w-8 h-8" />
+      {/* Kartu Utama Persiapan Ujian Siswa */}
+      <div className="backdrop-blur-xl bg-white/90 border border-white/80 rounded-3xl p-6 sm:p-8 shadow-xl">
+        {/* Error message banner */}
+        {errorMessage && (
+          <div className="mb-6 p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl flex items-center gap-2.5 text-xs sm:text-sm font-bold animate-fadeIn">
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+            <span>{errorMessage}</span>
           </div>
-          <div className="flex items-center justify-center gap-2 mb-1.5 flex-wrap">
-            <span className="text-[11px] font-black tracking-widest uppercase text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-0.5 rounded-full shadow-2xs">
-              Portal Akses Masuk Siswa CBT
-            </span>
-            <div
-              className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-bold border transition ${
-                isConnected
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                  : 'bg-amber-50 text-amber-800 border-amber-200'
-              }`}
-              title="Koneksi Cloud Firestore Database untuk sinkronisasi nilai otomatis"
-            >
-              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-              <Database className="w-3 h-3 text-emerald-600" />
-              <span>{isConnected ? 'Database Cloud Terhubung' : 'Menghubungkan DB...'}</span>
-            </div>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            Selamat Datang di Ruang Ujian
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1.5 leading-relaxed">
-            Silakan masukkan <strong>Nama Lengkap</strong> Anda dan <strong>Nomor Absensi</strong> untuk membuka lembar ujian dan mencatat evaluasi belajar.
-          </p>
-        </div>
+        )}
 
-        {/* Live Kartu Tanda Peserta Ujian Preview */}
-        <div className="max-w-2xl mx-auto mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 text-white shadow-lg border border-indigo-500/30 relative overflow-hidden">
-          <div className="absolute top-0 right-0 -mt-4 -mr-4 w-28 h-28 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative z-10">
-            <div className="flex items-center gap-3.5">
-              {/* Avatar Selector */}
-              <div className="relative group">
-                <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-3xl shadow-inner cursor-pointer hover:scale-105 transition-transform">
-                  {selectedAvatar}
-                </div>
-                <span className="absolute -bottom-1 -right-1 text-[9px] bg-indigo-500 text-white font-bold px-1.5 py-0.2 rounded-md border border-white/40">
-                  Ubah
-                </span>
-              </div>
-
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-indigo-300 bg-indigo-500/30 px-2 py-0.5 rounded-md border border-indigo-400/30">
-                  Kartu Peserta Ujian
-                </span>
-                <h3 className="text-base sm:text-lg font-black text-white mt-0.5 flex items-center gap-2">
-                  <span>{name.trim() ? name.trim() : 'Nama Siswa Belum Diisi'}</span>
-                  {name.trim().length >= 2 && (
-                    <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-full font-bold">
-                      ✓ Siap
-                    </span>
-                  )}
-                </h3>
-                <p className="text-xs text-slate-300 mt-0.5 flex items-center gap-2 flex-wrap">
-                  <span>No. Absen: <strong>{noAbsen.trim() || '-'}</strong></span>
-                  <span>•</span>
-                  <span>Kelas: <strong>{studentClass}</strong></span>
-                  <span>•</span>
-                  <span className="text-amber-300">Mapel: <strong>{activeSubject.name}</strong></span>
-                </p>
-              </div>
-            </div>
-
-            {/* Avatar Quick Switcher */}
-            <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10 self-end sm:self-auto">
-              {AVATAR_LIST.map((av) => (
-                <button
-                  key={av}
-                  type="button"
-                  onClick={() => {
-                    setSelectedAvatar(av);
-                    soundManager.playSelect();
-                  }}
-                  className={`w-7 h-7 rounded-lg text-sm flex items-center justify-center transition cursor-pointer ${
-                    selectedAvatar === av
-                      ? 'bg-indigo-600 scale-110 shadow-sm'
-                      : 'hover:bg-white/10 opacity-75 hover:opacity-100'
-                  }`}
-                  title="Pilih Avatar Profil Ujian"
-                >
-                  {av}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Form Login Murid */}
-        <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl mx-auto">
-          {/* Bagian Input: Nama & No. Absensi */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Identitas Siswa: Nama Lengkap, No Absen, Kelas */}
           <div className="bg-slate-50/90 rounded-2xl p-5 sm:p-6 border border-slate-200/90 space-y-4 shadow-2xs">
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                  <User className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                    Identitas Siswa Peserta Ujian
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Masukkan nama dan nomor absensi sebelum memulai lembar kuis
+                  </p>
+                </div>
+              </div>
+              {user && (
+                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full flex items-center gap-1">
+                  ✓ Database Cloud Aktif
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 pt-1">
               {/* 1. Nama Lengkap Siswa */}
               <div className="sm:col-span-8">
                 <label
@@ -852,44 +1393,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             </p>
           </div>
 
-          {/* Quick Access Guru / Pengawas */}
-          <div className="mt-6 pt-5 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs bg-slate-50/70 p-3.5 rounded-2xl">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-indigo-600" />
-              <span className="font-bold text-slate-700">
-                Pengawas atau Guru Pengampu?
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              {!user ? (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      await loginWithGoogle();
-                    } catch (e) {
-                      console.error(e);
-                    }
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-800 font-bold border border-slate-300 shadow-2xs flex items-center gap-1.5 cursor-pointer text-[11px]"
-                >
-                  <LogIn className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>Login Akun Guru (Google)</span>
-                </button>
-              ) : (
-                <span className="font-bold text-emerald-700 text-[11px] flex items-center gap-1">
-                  ✓ Guru Terhubung: {user.displayName || user.email}
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={onOpenRekap}
-                className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 cursor-pointer text-[11px]"
-              >
-                Rekap Nilai Siswa
-              </button>
-            </div>
-          </div>
         </form>
       </div>
 

@@ -44,6 +44,30 @@ service cloud.firestore {
       allow update, delete: if isBootstrappedAdmin();
     }
 
+    // Students Collection
+    function isValidStudent(data) {
+      return data.keys().hasAll(['id', 'name', 'email', 'role']) &&
+             data.keys().hasOnly(['id', 'name', 'email', 'role', 'studentClass', 'noAbsen', 'avatar', 'updatedAt']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.email is string && data.email.size() > 0 && data.email.size() <= 100 &&
+             data.role == 'student' &&
+             (!('studentClass' in data) || (data.studentClass is string && data.studentClass.size() <= 50)) &&
+             (!('noAbsen' in data) || (data.noAbsen is string && data.noAbsen.size() <= 50)) &&
+             (!('avatar' in data) || (data.avatar is string && data.avatar.size() <= 10));
+    }
+
+    match /students/{studentId} {
+      allow get: if isSignedIn() && (request.auth.uid == studentId || isAdmin());
+      allow list: if isAdmin();
+      allow create, update: if isSignedIn() &&
+                               isValidId(studentId) &&
+                               request.auth.uid == studentId &&
+                               isValidStudent(incoming()) &&
+                               incoming().id == studentId;
+      allow delete: if isAdmin();
+    }
+
     // Subjects Collection
     function isValidSubject(data) {
       return data.keys().hasAll(['id', 'name', 'totalQuizMinutes', 'passingGrade']) &&

@@ -245,12 +245,64 @@
         "passingGrade",
         "timeSpentSeconds"
       ]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Profil akun siswa yang terdaftar di database cloud",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "UID akun siswa dari Firebase Auth"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Nama lengkap siswa"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Alamat email siswa"
+        },
+        "studentClass": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Kelas siswa"
+        },
+        "noAbsen": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Nomor absen atau NIS siswa"
+        },
+        "avatar": {
+          "type": "string",
+          "maxLength": 10,
+          "description": "Emoji avatar profil siswa"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["student"],
+          "description": "Peran pengguna siswa"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Waktu pembaharuan profil terakhir"
+        }
+      },
+      "required": ["id", "name", "email", "role"]
     }
   },
   "firestore": {
     "/admins/{adminId}": {
       "schema": "Admin",
       "description": "Koleksi akun administrator dan guru pengampu ujian"
+    },
+    "/students/{studentId}": {
+      "schema": "Student",
+      "description": "Koleksi profil akun siswa yang login ke database"
     },
     "/subjects/{subjectId}": {
       "schema": "Subject",

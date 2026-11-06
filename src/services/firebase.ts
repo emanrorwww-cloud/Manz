@@ -22,7 +22,7 @@ import {
   onSnapshot,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { Question, Subject, QuizResult } from '../types';
+import { Question, Subject, QuizResult, StudentProfile, UserRole } from '../types';
 
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
@@ -101,6 +101,41 @@ export async function testConnection(): Promise<boolean> {
   }
 }
 
+// --- STUDENT PROFILE HELPERS ---
+export async function fetchStudentProfileFromFirestore(uid: string): Promise<StudentProfile | null> {
+  const path = `students/${uid}`;
+  try {
+    const snap = await getDoc(doc(db, 'students', uid));
+    if (snap.exists()) {
+      return snap.data() as StudentProfile;
+    }
+    return null;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+  }
+}
+
+export async function saveStudentProfileToFirestore(profile: StudentProfile): Promise<void> {
+  const path = `students/${profile.id}`;
+  try {
+    const docRef = doc(db, 'students', profile.id);
+    const cleanData: Record<string, any> = {
+      id: profile.id,
+      name: profile.name.slice(0, 100),
+      email: profile.email.slice(0, 100),
+      role: 'student',
+      updatedAt: new Date().toISOString(),
+    };
+    if (profile.studentClass) cleanData.studentClass = profile.studentClass.slice(0, 50);
+    if (profile.noAbsen) cleanData.noAbsen = profile.noAbsen.slice(0, 50);
+    if (profile.avatar) cleanData.avatar = profile.avatar.slice(0, 10);
+
+    await setDoc(docRef, cleanData, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
 // Authentication Helpers
 export async function loginWithGoogle(): Promise<User> {
   try {
@@ -126,6 +161,57 @@ export async function loginWithGoogle(): Promise<User> {
     console.error('Google Sign In failed:', err);
     throw err;
   }
+}
+
+export async function loginStudentWithGoogle(meta?: {
+  name?: string;
+  studentClass?: string;
+  noAbsen?: string;
+  avatar?: string;
+}): Promise<{ user: User; profile: StudentProfile }> {
+  try {
+    const cred = await signInWithPopup(auth, googleProvider);
+    const user = cred.user;
+
+    // Check existing profile
+    let existingProfile: StudentProfile | null = null;
+    try {
+      existingProfile = await fetchStudentProfileFromFirestore(user.uid);
+    } catch {
+      // not yet created
+    }
+
+    const resolvedName = meta?.name?.trim() || existingProfile?.name || user.displayName || 'Siswa CBT';
+    const resolvedClass = meta?.studentClass?.trim() || existingProfile?.studentClass || '8A';
+    const resolvedAbsen = meta?.noAbsen?.trim() || existingProfile?.noAbsen || '1';
+    const resolvedAvatar = meta?.avatar || existingProfile?.avatar || '🧑‍🎓';
+
+    const profile: StudentProfile = {
+      id: user.uid,
+      name: resolvedName,
+      email: user.email || '',
+      studentClass: resolvedClass,
+      noAbsen: resolvedAbsen,
+      avatar: resolvedAvatar,
+      role: 'student',
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      await saveStudentProfileToFirestore(profile);
+    } catch (err) {
+      console.warn('Could not save initial student profile to firestore:', err);
+    }
+
+    return { user, profile };
+  } catch (err) {
+    console.error('Student Google Sign In failed:', err);
+    throw err;
+  }
+}
+
+export async function loginTeacherWithGoogle(): Promise<User> {
+  return await loginWithGoogle();
 }
 
 export async function logoutUser(): Promise<void> {

@@ -43,10 +43,26 @@ export interface QuizSettings {
   teacherName?: string;
 }
 
+export type UserRole = 'student' | 'teacher' | 'admin';
+export type PortalRole = 'siswa' | 'guru' | 'piket' | 'kepsek' | 'admin';
+
+export interface StudentProfile {
+  id: string;
+  name: string;
+  email: string;
+  studentClass: string;
+  noAbsen: string;
+  avatar?: string;
+  role: 'student';
+  updatedAt?: string;
+}
+
 export interface StudentInfo {
   name: string;
   studentClass: string;
   nis: string;
+  email?: string;
+  avatar?: string;
 }
 
 export interface QuizAnswerRecord {

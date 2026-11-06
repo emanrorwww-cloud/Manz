@@ -2,6 +2,10 @@
 
 ## 1. Data Invariants
 - Admin documents in `/admins/{adminId}` can only be read or written by authenticated administrators. The bootstrapped admin email is `emanrorwww@gmail.com`.
+- Student documents in `/students/{studentId}`:
+  - Can be read by the student owner (`request.auth.uid == studentId`) or by an admin.
+  - Can only be created/updated by the authenticated student themselves (`request.auth.uid == studentId`).
+  - Role is strictly restricted to `role: 'student'`.
 - Subject documents in `/subjects/{subjectId}` are readable by authenticated users and manageable (create/update/delete) only by verified admins/teachers.
 - Question documents in `/questions/{questionId}` are readable by authenticated users and manageable only by verified admins/teachers.
 - Result documents in `/results/{resultId}`:

@@ -13,6 +13,8 @@ import {
   LogOut,
   ShieldCheck,
   Cloud,
+  KeyRound,
+  Check,
 } from 'lucide-react';
 import { AppView } from '../types';
 import { soundManager } from '../utils/sound';
@@ -33,8 +35,20 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [soundActive, setSoundActive] = useState<boolean>(soundManager.getSoundEnabled());
   const [showHelp, setShowHelp] = useState<boolean>(false);
-  const { user, isAdmin, isConnected, loginWithGoogle, logout } = useFirebase();
+  const {
+    user,
+    userRole,
+    studentProfile,
+    isAdmin,
+    isStudent,
+    isTeacher,
+    isConnected,
+    loginStudent,
+    loginTeacher,
+    logout,
+  } = useFirebase();
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   const toggleSound = () => {
     const newVal = soundManager.toggleSound();
@@ -42,13 +56,27 @@ export const Navbar: React.FC<NavbarProps> = ({
     if (newVal) soundManager.playSelect();
   };
 
-  const handleLoginClick = async () => {
+  const handleStudentLogin = async () => {
     try {
       setIsLoggingIn(true);
-      await loginWithGoogle();
-      soundManager.playSelect();
-    } catch (e) {
-      console.error(e);
+      setLoginError(null);
+      await loginStudent();
+      soundManager.playCorrect();
+    } catch (e: any) {
+      setLoginError('Gagal masuk akun Google Siswa. Silakan coba lagi.');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleTeacherLogin = async () => {
+    try {
+      setIsLoggingIn(true);
+      setLoginError(null);
+      await loginTeacher();
+      soundManager.playCorrect();
+    } catch (e: any) {
+      setLoginError('Gagal masuk akun Google Guru. Pastikan popup Google diizinkan.');
     } finally {
       setIsLoggingIn(false);
     }
@@ -170,7 +198,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="hidden lg:inline">Database Online</span>
               </div>
 
-              {/* User Account / Google Login */}
+              {/* User Account / Dual Login */}
               {user ? (
                 <div className="flex items-center gap-1.5 bg-white/70 border border-white/80 rounded-xl p-1 pr-2 shadow-2xs backdrop-blur-xs">
                   {user.photoURL ? (
@@ -181,27 +209,34 @@ export const Navbar: React.FC<NavbarProps> = ({
                     />
                   ) : (
                     <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">
-                      {(user.displayName || user.email || 'G')[0].toUpperCase()}
+                      {isStudent
+                        ? (studentProfile?.avatar || '🧑‍🎓')
+                        : (user.displayName || user.email || 'G')[0].toUpperCase()}
                     </div>
                   )}
                   <div className="hidden sm:block text-left">
-                    <p className="text-[11px] font-bold text-slate-800 leading-tight max-w-[100px] truncate">
-                      {user.displayName || user.email?.split('@')[0]}
+                    <p className="text-[11px] font-bold text-slate-800 leading-tight max-w-[110px] truncate">
+                      {isStudent
+                        ? (studentProfile?.name || user.displayName || user.email?.split('@')[0])
+                        : (user.displayName || user.email?.split('@')[0])}
                     </p>
-                    <span className="text-[9px] font-extrabold text-indigo-700 flex items-center gap-0.5">
-                      {isAdmin ? (
-                        <>
-                          <ShieldCheck className="w-2.5 h-2.5 text-indigo-600" />
-                          Guru/Admin
-                        </>
+                    <span className="text-[9px] font-extrabold flex items-center gap-0.5">
+                      {isTeacher ? (
+                        <span className="text-purple-700 flex items-center gap-0.5">
+                          <ShieldCheck className="w-2.5 h-2.5 text-purple-600" />
+                          {isAdmin ? 'Admin' : 'Guru'}
+                        </span>
                       ) : (
-                        'Pengguna'
+                        <span className="text-emerald-700 flex items-center gap-0.5">
+                          <GraduationCap className="w-2.5 h-2.5 text-emerald-600" />
+                          Siswa {studentProfile?.studentClass ? `(${studentProfile.studentClass})` : ''}
+                        </span>
                       )}
                     </span>
                   </div>
                   <button
                     onClick={handleLogoutClick}
-                    title="Keluar Akun Google"
+                    title="Keluar Akun Database"
                     className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
                   >
                     <LogOut className="w-3.5 h-3.5" />
@@ -209,16 +244,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               ) : (
                 <button
-                  id="btn-login-google"
-                  onClick={handleLoginClick}
+                  id="btn-login-database"
+                  onClick={handleStudentLogin}
                   disabled={isLoggingIn}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold shadow-2xs transition cursor-pointer"
-                  title="Masuk dengan akun Google untuk sinkronisasi nilai ke Cloud Firestore"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs font-black shadow-sm transition cursor-pointer disabled:opacity-50"
+                  title="Hubungkan akun Google untuk sinkronisasi nilai cloud"
                 >
-                  <LogIn className="w-3.5 h-3.5 text-indigo-600" />
-                  <span className="hidden sm:inline">
-                    {isLoggingIn ? 'Memproses...' : 'Masuk Guru'}
-                  </span>
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{isLoggingIn ? 'Menghubungkan...' : 'Masuk Database'}</span>
                 </button>
               )}
 

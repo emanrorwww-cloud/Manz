@@ -152,7 +152,7 @@ export function getLastStudentInfo(): LastStudentData {
   } catch (e) {
     console.error(e);
   }
-  return { name: '', noAbsen: '', studentClass: '8A' };
+  return { name: '', noAbsen: '', studentClass: 'X MIPA 1' };
 }
 
 export function saveLastStudentInfo(data: LastStudentData): void {
